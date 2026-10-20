@@ -1,0 +1,39 @@
+[project]
+name = "pos-mle-tech-challenge-2"
+version = "0.1.0"
+description = "Pipeline de engenharia de ML para propensão de compra em e-commerce (FIAP Pós MLE - Tech Challenge Fase 2)"
+readme = "README.md"
+authors = [
+    { name = "paulooorg", email = "goncalvesrpaulo@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "dvc>=3.50",
+    "mlflow>=3.0",
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "python-dotenv>=1.0",
+    "pyyaml>=6.0",
+    "scikit-learn>=1.5",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "jupyterlab>=4.2",
+    "matplotlib>=3.9",
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "seaborn>=0.13",
+    "xgboost>=3.4.1",
+]
+
+[tool.ruff]
+target-version = "py312"
+extend-exclude = ["notebooks"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

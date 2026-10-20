@@ -1,0 +1,24 @@
+# Ambientes e caches
+.venv
+__pycache__/
+*.py[oc]
+.ruff_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Segredos locais
+.env
+
+# Artefatos locais de MLflow
+mlruns/
+mlartifacts/
+mlflow.db
+
+# Dados (chegam via dvc pull), exploração e documentação
+data/
+notebooks/
+docs/
+specs/
+
+# OS
+.DS_Store

@@ -1,0 +1,28 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv
+
+# Env
+.env
+
+# Tooling caches
+.ruff_cache/
+.pytest_cache/
+
+# MLflow (local tracking)
+mlruns/
+mlartifacts/
+mlflow.db
+
+# OS
+.DS_Store
