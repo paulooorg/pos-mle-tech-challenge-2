@@ -29,5 +29,5 @@ up: ## Sobe a infra local (RustFS e MLflow), cria os buckets e envia o dado
 	docker compose up -d --wait rustfs init mlflow
 	uv run dvc push
 
-train: ## Roda o trainer no container (reconstrói a imagem antes)
+train: ## Roda o trainer no container: treina, registra no MLflow e aplica o portão
 	docker compose run --build --rm trainer

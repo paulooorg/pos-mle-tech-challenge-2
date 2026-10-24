@@ -83,6 +83,7 @@ services:
       <<: *s3-credentials
       DVC_S3_ENDPOINT_URL: http://rustfs:9000
       MLFLOW_TRACKING_URI: http://mlflow:5000
+      GIT_PYTHON_REFRESH: quiet # a imagem não tem o binário git; o commit vem do .git (RunLineage)
     depends_on:
       mlflow:
         condition: service_healthy
