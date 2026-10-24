@@ -19,6 +19,9 @@ wheels/
 .ruff_cache/
 .pytest_cache/
 
+# Log do reproduzir.sh
+reproducao.log
+
 # MLflow (local tracking)
 mlruns/
 mlartifacts/

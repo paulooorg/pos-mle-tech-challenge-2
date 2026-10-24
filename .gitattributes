@@ -1,0 +1,7 @@
+# Scripts executados dentro de containers/make: sempre LF (CRLF quebra o shebang e o make)
+*.sh text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf
+
+# O dataset é versionado por hash (DVC): nunca converter as quebras de linha dele
+data/source/*.csv -text
