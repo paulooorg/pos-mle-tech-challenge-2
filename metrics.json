@@ -1,0 +1,6 @@
+{
+  "n_train": 6013,
+  "n_test": 1504,
+  "positive_rate_train": 0.1241,
+  "positive_rate_test": 0.1237
+}

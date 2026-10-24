@@ -1,0 +1,100 @@
+schema: '2.0'
+stages:
+  preprocess:
+    cmd: python -m pos_mle_tech_challenge_2.pipelines.preprocess
+    deps:
+    - path: data/raw/online_shoppers_intention.csv
+      hash: md5
+      md5: a5c8ab766d920cc3a7afb9038ee6c47e
+      size: 654917
+    - path: src/pos_mle_tech_challenge_2/config.py
+      hash: md5
+      md5: ea465895ad079d11fa5989b94889d68a
+      size: 2463
+    - path: src/pos_mle_tech_challenge_2/data
+      hash: md5
+      md5: dad9a42e88df927eb9a063f475982b04.dir
+      size: 11346
+      nfiles: 10
+    - path: src/pos_mle_tech_challenge_2/params.py
+      hash: md5
+      md5: 30cd4b15437502bcd7755a3c9d20c1f7
+      size: 1506
+    - path: src/pos_mle_tech_challenge_2/pipelines/preprocess.py
+      hash: md5
+      md5: 5fb8cc018845004decf77f7cc61b1fa5
+      size: 1798
+    params:
+      params.yaml:
+        seed: 42
+        split:
+          test_size: 0.2
+          drop_duplicates: true
+    outs:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 192ec28218f6134b09dc1d957fe6654c
+      size: 135124
+    - path: data/processed/train.csv
+      hash: md5
+      md5: fd1c200d81266ca0a57636f1815e5463
+      size: 537508
+  train:
+    cmd: python -m pos_mle_tech_challenge_2.pipelines.train
+    deps:
+    - path: data/processed/test.csv
+      hash: md5
+      md5: 192ec28218f6134b09dc1d957fe6654c
+      size: 135124
+    - path: data/processed/train.csv
+      hash: md5
+      md5: fd1c200d81266ca0a57636f1815e5463
+      size: 537508
+    - path: src/pos_mle_tech_challenge_2/config.py
+      hash: md5
+      md5: ea465895ad079d11fa5989b94889d68a
+      size: 2463
+    - path: src/pos_mle_tech_challenge_2/data
+      hash: md5
+      md5: dad9a42e88df927eb9a063f475982b04.dir
+      size: 11346
+      nfiles: 10
+    - path: src/pos_mle_tech_challenge_2/features
+      hash: md5
+      md5: 8353818b47127265918f7bdd9335edfa.dir
+      size: 51
+      nfiles: 1
+    - path: src/pos_mle_tech_challenge_2/params.py
+      hash: md5
+      md5: 30cd4b15437502bcd7755a3c9d20c1f7
+      size: 1506
+    - path: src/pos_mle_tech_challenge_2/pipelines/train.py
+      hash: md5
+      md5: 5c4ef6d7ddbafd7d89bbc66f34efde1e
+      size: 1858
+    - path: src/pos_mle_tech_challenge_2/training
+      hash: md5
+      md5: ede2983e8404bfd63b99d914e823a768.dir
+      size: 68
+      nfiles: 1
+    params:
+      params.yaml:
+        model:
+          type: hist_gradient_boosting
+          params:
+            learning_rate: 0.05
+            max_depth: 5
+            max_leaf_nodes: 15
+            min_samples_leaf: 100
+            l2_regularization: 1.0
+            class_weight: balanced
+        seed: 42
+        train:
+          cv_folds: 5
+          primary_metric: average_precision
+          threshold: 0.73
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 02f10291abd30254fa421cbba171e80a
+      size: 105

@@ -1,0 +1,34 @@
+stages:
+  preprocess:
+    cmd: python -m pos_mle_tech_challenge_2.pipelines.preprocess
+    deps:
+      - data/raw/online_shoppers_intention.csv
+      - src/pos_mle_tech_challenge_2/config.py
+      - src/pos_mle_tech_challenge_2/params.py
+      - src/pos_mle_tech_challenge_2/data
+      - src/pos_mle_tech_challenge_2/pipelines/preprocess.py
+    params:
+      - seed
+      - split
+    outs:
+      - data/processed/train.csv
+      - data/processed/test.csv
+
+  train:
+    cmd: python -m pos_mle_tech_challenge_2.pipelines.train
+    deps:
+      - data/processed/train.csv
+      - data/processed/test.csv
+      - src/pos_mle_tech_challenge_2/config.py
+      - src/pos_mle_tech_challenge_2/params.py
+      - src/pos_mle_tech_challenge_2/data
+      - src/pos_mle_tech_challenge_2/features
+      - src/pos_mle_tech_challenge_2/training
+      - src/pos_mle_tech_challenge_2/pipelines/train.py
+    params:
+      - seed
+      - train
+      - model
+    metrics:
+      - metrics.json:
+          cache: false

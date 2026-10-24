@@ -1,0 +1,8 @@
+[core]
+    remote = rustfs
+['remote "rustfs"']
+    url = s3://dvc-remote/store
+    endpointurl = http://localhost:9000
+    region = us-east-1
+['remote "local"']
+    url = ../../pos-mle-tc2-dvc-remote
