@@ -1,7 +1,7 @@
 RAW_FILE := data/raw/online_shoppers_intention.csv
 
 .DEFAULT_GOAL := help
-.PHONY: help install check repro data-v1 data-v2 up train
+.PHONY: help install check repro data-v1 data-v2 up train clean
 
 help: ## Lista os alvos disponíveis
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
@@ -26,8 +26,20 @@ data-v2: ## Libera o dado v2 (completo) e registra no DVC
 	uv run dvc add $(RAW_FILE)
 
 up: ## Sobe a infra local (RustFS e MLflow), cria os buckets e envia o dado
-	docker compose up -d --wait rustfs init mlflow
+	docker compose up -d --build --wait rustfs init mlflow
 	uv run dvc push
 
 train: ## Roda o trainer no container: treina, registra no MLflow e aplica o portão
 	docker compose run --build --rm trainer
+
+clean: ## Reseta o estado local (como numa máquina nova) para repetir docs/reproducao.md
+	@echo "Isto apaga: volumes do Docker (bucket e MLflow do compose), data/raw/*.csv,"
+	@echo "data/processed/*.csv, mlflow.db, mlruns/, cache e credenciais locais do DVC."
+	@echo "Arquivos versionados no git (dvc.lock, metrics.json, ponteiro .dvc) não são tocados."
+	@read -p "Continuar? [s/N] " answer && [ "$$answer" = "s" ]
+	docker compose down -v || echo "Docker indisponível: os volumes não foram removidos"
+	rm -rf mlflow.db mlruns mlartifacts .dvc/cache .dvc/tmp .dvc/config.local
+	rm -f $(RAW_FILE) data/processed/train.csv data/processed/test.csv
+	@echo "Pronto. Para repetir o guia: configure as credenciais do DVC (passo 2) e rode make data-v1."
+	@echo "Se aparecerem alterações abaixo, descarte com: git restore dvc.lock metrics.json $(RAW_FILE).dvc"
+	@git status --short -- dvc.lock metrics.json $(RAW_FILE).dvc
