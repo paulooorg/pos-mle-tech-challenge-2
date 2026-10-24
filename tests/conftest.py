@@ -1,7 +1,9 @@
 """Fixtures compartilhadas dos testes."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from pathlib import Path
 
+import mlflow
 import numpy as np
 import pandas as pd
 import pytest
@@ -72,3 +74,13 @@ def make_xy(
         return df.drop(columns=[TARGET]), df[TARGET]
 
     return _make
+
+
+@pytest.fixture
+def mlflow_uri(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
+    """MLflow isolado: banco SQLite e artefatos dentro do diretório temporário."""
+    monkeypatch.chdir(tmp_path)
+    previous_uri = mlflow.get_tracking_uri()
+    yield f"sqlite:///{tmp_path}/mlflow.db"
+    mlflow.set_tracking_uri(previous_uri)
+    mlflow.set_registry_uri(previous_uri)
