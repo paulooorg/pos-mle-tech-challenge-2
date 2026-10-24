@@ -6,7 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pos_mle_tech_challenge_2.data.schema import NUMERIC_FEATURES, TARGET
+from pos_mle_tech_challenge_2.data.schema import (
+    CATEGORICAL_FEATURES,
+    NUMERIC_FEATURES,
+    TARGET,
+)
 
 SETTINGS_ENV_VARS = (
     "MLFLOW_TRACKING_URI",
@@ -49,5 +53,22 @@ def make_sessions() -> Callable[..., pd.DataFrame]:
         n_positive = int(n_rows * positive_rate)
         data[TARGET] = [True] * n_positive + [False] * (n_rows - n_positive)
         return pd.DataFrame(data)
+
+    return _make
+
+
+@pytest.fixture
+def make_xy(
+    make_sessions: Callable[..., pd.DataFrame],
+) -> Callable[..., tuple[pd.DataFrame, pd.Series]]:
+    """Fábrica de (features, alvo) sintéticos já com os tipos do DataLoader."""
+
+    def _make(
+        n_rows: int = 200, positive_rate: float = 0.2
+    ) -> tuple[pd.DataFrame, pd.Series]:
+        df = make_sessions(n_rows, positive_rate)
+        df[list(CATEGORICAL_FEATURES)] = df[list(CATEGORICAL_FEATURES)].astype(str)
+        df[TARGET] = df[TARGET].astype(int)
+        return df.drop(columns=[TARGET]), df[TARGET]
 
     return _make
