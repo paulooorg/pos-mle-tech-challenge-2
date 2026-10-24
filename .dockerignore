@@ -8,17 +8,25 @@ __pycache__/
 
 # Segredos locais
 .env
+.dvc/config.local
+
+# Cache e temporários do DVC (os dados chegam via dvc pull)
+.dvc/cache
+.dvc/tmp
 
 # Artefatos locais de MLflow
 mlruns/
 mlartifacts/
 mlflow.db
 
-# Dados (chegam via dvc pull), exploração e documentação
-data/
+# Dados em si (ponteiros .dvc e .gitignore de data/ continuam na imagem)
+data/**/*.csv
+
+# Exploração, documentação e testes
 notebooks/
 docs/
 specs/
+tests/
 
 # OS
 .DS_Store

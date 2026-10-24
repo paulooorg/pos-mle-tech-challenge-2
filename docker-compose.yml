@@ -1,0 +1,92 @@
+# Infra local: S3 (RustFS), servidor MLflow e trainer. Uso:
+#   docker compose up -d rustfs init mlflow     # sobe a infra e cria os buckets
+#   docker compose run --build --rm trainer     # dvc pull + dvc repro
+name: pos-mle-tc2
+
+x-project-image: &project-image
+  build: .
+  image: pos-mle-tc2
+
+x-s3-credentials: &s3-credentials
+  AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:-devadmin}
+  AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:-devadmin-secret}
+  AWS_DEFAULT_REGION: us-east-1
+
+services:
+  rustfs:
+    # Versão 1.0.3 fixada pelo digest (a imagem não tem label de versão).
+    image: rustfs/rustfs:1.0.3@sha256:9ca9559533b537d10482fe923288b676ad08f92a7069d9a17327fbae3cab688b
+    ports:
+      - "9000:9000" # API S3
+      - "9001:9001" # console
+    environment:
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-devadmin}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-devadmin-secret}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    command: /data
+    volumes:
+      - rustfs_data:/data # volume nomeado: a imagem roda como UID 10001
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  init:
+    image: amazon/aws-cli
+    entrypoint: ["/bin/sh", "/scripts/init_buckets.sh"]
+    environment:
+      <<: *s3-credentials
+      S3_ENDPOINT_URL: http://rustfs:9000
+      BUCKETS: "dvc-remote mlflow-artifacts"
+    volumes:
+      - ./scripts/init_buckets.sh:/scripts/init_buckets.sh:ro
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    restart: "no"
+
+  mlflow:
+    <<: *project-image
+    command: >
+      mlflow server --host 0.0.0.0 --port 5000 --workers 1
+      --backend-store-uri sqlite:////mlflow-data/mlflow.db
+      --artifacts-destination s3://mlflow-artifacts
+      --serve-artifacts
+      --allowed-hosts localhost:5000,127.0.0.1:5000,localhost:5001,127.0.0.1:5001,mlflow:5000
+    environment:
+      <<: *s3-credentials
+      MLFLOW_S3_ENDPOINT_URL: http://rustfs:9000
+      MLFLOW_DISABLE_AGENT_HINT: "1"
+    ports:
+      - "5001:5000" # 5000 costuma estar ocupada pelo AirPlay no macOS
+    volumes:
+      - mlflow_data:/mlflow-data
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  trainer:
+    <<: *project-image
+    environment:
+      <<: *s3-credentials
+      DVC_S3_ENDPOINT_URL: http://rustfs:9000
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+volumes:
+  rustfs_data:
+  mlflow_data:
