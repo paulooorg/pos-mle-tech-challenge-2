@@ -22,6 +22,7 @@ SETTINGS_ENV_VARS = (
     "DATA_RAW_PATH",
     "DATA_PROCESSED_DIR",
     "LOG_LEVEL",
+    "MODEL_VERSION",
 )
 
 

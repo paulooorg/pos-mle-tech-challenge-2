@@ -21,6 +21,7 @@ DEFAULTS: dict[str, str] = {
     "DATA_RAW_PATH": "data/raw/online_shoppers_intention.csv",
     "DATA_PROCESSED_DIR": "data/processed",
     "LOG_LEVEL": "INFO",
+    "MODEL_VERSION": "champion",
 }
 
 
@@ -35,6 +36,7 @@ class Settings:
     data_raw_path: Path
     data_processed_dir: Path
     log_level: str
+    model_version: str
 
 
 def _read(name: str) -> str:
@@ -67,6 +69,7 @@ def load_settings(env_file: Path | None = None) -> Settings:
         data_raw_path=_read_path("DATA_RAW_PATH"),
         data_processed_dir=_read_path("DATA_PROCESSED_DIR"),
         log_level=_read("LOG_LEVEL").upper(),
+        model_version=_read("MODEL_VERSION"),
     )
 
 

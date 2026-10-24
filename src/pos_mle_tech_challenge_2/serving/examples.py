@@ -61,3 +61,9 @@ EXAMPLE_SESSIONS: dict[str, dict[str, Any]] = {
         "Weekend": True,
     },
 }
+
+EXAMPLE_SUMMARIES: dict[str, str] = {
+    "alta_propensao": "Alta propensão: PageValues alto, visitante novo, novembro",
+    "navegacao_curta": "Navegação curta: sai rápido, sem valor de página",
+    "visitante_recorrente": "Visitante recorrente fora da alta temporada",
+}

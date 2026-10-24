@@ -70,3 +70,15 @@ def test_settings_are_immutable(missing_env_file: Path) -> None:
 
     with pytest.raises(FrozenInstanceError):
         settings.log_level = "DEBUG"  # type: ignore[misc]
+
+
+def test_model_version_defaults_to_the_champion(missing_env_file: Path) -> None:
+    assert load_settings(missing_env_file).model_version == "champion"
+
+
+def test_model_version_can_pin_a_number(
+    monkeypatch: pytest.MonkeyPatch, missing_env_file: Path
+) -> None:
+    monkeypatch.setenv("MODEL_VERSION", "3")
+
+    assert load_settings(missing_env_file).model_version == "3"
