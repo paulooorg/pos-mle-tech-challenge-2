@@ -18,6 +18,8 @@ data/raw/*.csv ── dvc add ──▶ ponteiro .dvc (git)  +  dado no bucket S
 [preprocess]  remove duplicatas, split estratificado ──▶ data/processed/{train,test}.csv
       ▼
 [train]  validação cruzada, teste, MLflow Tracking, Model Registry e portão de promoção
+      ▼
+[inference]  API que serve o modelo registrado (champion ou uma versão fixada)  ← extra
 ```
 
 - **Git** guarda código, `dvc.yaml`, `dvc.lock`, `params.yaml` e os ponteiros `.dvc`.
@@ -46,7 +48,7 @@ cd pos-mle-tech-challenge-2
 ./reproduzir.sh
 ```
 
-Um único comando reproduz tudo: instala o ambiente, roda os testes, executa o pipeline DVC, sobe a infraestrutura (S3 local e MLflow) e treina no container, incluindo o cenário de dado novo com promoção do modelo. Cada etapa é conferida (`OK` ou `FALHOU`) e, no final, a infraestrutura continua de pé para você explorar o MLflow em http://localhost:5001. O script **começa resetando o estado local** e pede confirmação (`--sim` para confirmar sem terminal). Duração: 15 a 25 minutos.
+Um único comando reproduz tudo: instala o ambiente, roda os testes, executa o pipeline DVC, sobe a infraestrutura (S3 local e MLflow) e treina no container, incluindo o cenário de dado novo com promoção do modelo, e, como extra, sobe a API de inferência trocando de versão do modelo. Cada etapa é conferida (`OK` ou `FALHOU`) e, no final, a infraestrutura continua de pé para você explorar o MLflow em http://localhost:5001. O script **começa resetando o estado local** e pede confirmação (`--sim` para confirmar sem terminal). Duração: 15 a 25 minutos.
 
 O [guia de reprodução](docs/reproducao.md) explica o que cada etapa faz e traz os comandos para executá-las à mão.
 
@@ -60,6 +62,7 @@ O [guia de reprodução](docs/reproducao.md) explica o que cada etapa faz e traz
 | `make data-v1` / `make data-v2` | libera uma versão do dado e registra no DVC (não faz commit nem treina) |
 | `make up` | reconstrói a imagem, sobe RustFS e MLflow, cria os buckets (`docker compose up --build --wait`) e faz `dvc push` |
 | `make train` | roda o `trainer` no container (reconstrói a imagem; sempre treina) |
+| `make deploy-inference MODEL=…` | sobe ou atualiza a API de inferência (porta 8000): `MODEL=champion` (padrão) ou o número de uma versão (`MODEL=1`); precisa de `make up` e `make train` antes |
 | `make clean` | reseta o estado local (volumes, dados gerados, MLflow local, cache e credenciais do DVC) para repetir o guia; pede confirmação e não toca em arquivos do git |
 
 Outros comandos úteis, sem atalho:
@@ -86,13 +89,16 @@ src/pos_mle_tech_challenge_2/
   training/                     # model_factory, evaluator, tracker (MLflow), registry,
                                 # promotion (portão), reporting (figuras), lineage, trainer
   pipelines/                    # preprocess.py e train.py: estágios do DVC
+  serving/                      # API de inferência: schemas, model_loader, predictor, api
 scripts/                        # release_data.py, init_buckets.py, trainer_entrypoint.sh
 tests/                          # testes automatizados (pytest)
 notebooks/                      # EDA e escolha do modelo (fora do pipeline)
 data/source/                    # dataset completo (commitado, semente dos scripts)
 data/raw/, data/processed/      # versionados pelo DVC (fora do git)
 dvc.yaml, dvc.lock, params.yaml # pipeline, seus hashes e os parâmetros
-Dockerfile, docker-compose.yml  # imagem do projeto e infraestrutura local
+Dockerfile                      # imagem do trainer (também serve o MLflow)
+Dockerfile.inference            # imagem enxuta da inferência (só o grupo `serving`)
+docker-compose.yml              # infraestrutura local: RustFS, MLflow, trainer, inference
 docs/                           # enunciado do desafio e guia de reprodução
 reproduzir.sh                   # reproduz tudo com um comando
 ```
@@ -107,6 +113,39 @@ reproduzir.sh                   # reproduz tudo com um comando
 - **Trainer como job:** o `make train` sempre treina e deixa o portão decidir; o `make repro` no host respeita o cache do DVC.
 - **Dado novo simulado:** o dataset é cortado por mês (v1 sem Nov e Dec; v2 completo). Os meses novos concentram mais volume e mudam o comportamento (Nov converte 25%).
 
+## Inferência (extra)
+
+Uma API (FastAPI) serve o modelo registrado no MLflow. **Qual modelo** é uma variável de ambiente, `MODEL_VERSION`: `champion` (padrão, segue o alias do Registry) ou o número de uma versão (por exemplo `1`). Trocar de modelo é um **deploy**: recriar o container com outro valor.
+
+```bash
+make deploy-inference                # serve o champion
+make deploy-inference MODEL=1        # fixa a versão 1
+```
+
+| Endpoint | Função |
+|---|---|
+| `GET /health` | pronto? Informa a versão carregada (`503` se o modelo não carregou) |
+| `GET /model` | nome, versão, `run_id`, threshold, hash do dado, commit e PR-AUC do modelo |
+| `POST /predict` | lote de sessões: probabilidade de compra e classe de cada uma |
+| `GET /docs` | Swagger, com 4 exemplos prontos |
+
+A classe vem do **threshold da versão** (0,73), gravado como tag no Registry pelo trainer. Se `MODEL_VERSION` pedir uma versão inexistente, o serviço sobe, mas responde `503` com o motivo, e o deploy acusa `unhealthy`. Os exemplos do Swagger incluem um caso de fronteira em que versões diferentes do modelo discordam (o resultado muda ao trocar de versão).
+
+## Do projeto à produção
+
+O que fizemos mapeia, em escala menor, para o que se vê no mercado:
+
+| Aqui | Em produção (por exemplo, Kubernetes) |
+|---|---|
+| `make train`: container que treina e termina | `Job` ou `CronJob`, disparado por Argo, Airflow ou Kubeflow |
+| `make deploy-inference`: container sempre ligado | `Deployment` com réplicas atrás de um `Service`, com autoscaling |
+| Dado novo: `make data-v2` + commit do ponteiro | ingestão e validação, que registram a versão do dado (ponteiro do DVC ou partição/snapshot do data lake) e disparam o treino |
+| Gatilho do treino: um comando seu | agenda, evento de dado novo, alerta de drift ou chamada de API |
+| Portão: nova versão só vira champion se superar a atual no mesmo teste | o mesmo, mais validações online (canary, shadow) antes de assumir todo o tráfego |
+| `MODEL_VERSION` define o modelo no deploy | versão fixada na configuração do deploy (GitOps), com rollback por reversão de commit |
+
+Fica de fora, por escopo: gatilho automático de treino, validação de dados na entrada, monitoramento de drift e de métricas online, CI/CD, canary, gerenciamento de segredos (as credenciais aqui são só de desenvolvimento) e MLflow com banco de produção (aqui é SQLite).
+
 ## Configuração
 
 - **`.env`** (modelo em `.env.example`): infraestrutura (URI do MLflow, nomes, caminhos, credenciais de desenvolvimento do S3 local). O `.env` não vai para o git.
@@ -117,7 +156,7 @@ reproduzir.sh                   # reproduz tudo com um comando
 - **`PageValues` domina o modelo** (importância por permutação ≈ 0,55; a segunda feature, `Month`, ≈ 0,05). A variável é calculada a partir de páginas visitadas *antes de uma transação*, então pode embutir parte da própria compra (possível vazamento parcial).
 - O conjunto de teste é pequeno (~380 compras na v2): diferenças de ~0,01 em PR-AUC entre modelos não são significativas.
 - Carregar artefatos do MLflow do compose **pela máquina do desenvolvedor** não funciona de forma prática (o servidor entrega URLs internas do S3). Treino, portão e consulta de métricas e versões não são afetados.
-- A imagem Docker tem ~2,5 GB (MLflow completo, DVC com S3 e Scikit-Learn).
+- A imagem do trainer tem ~2,5 GB (MLflow completo, DVC com S3 e Scikit-Learn); a da inferência, ~1,3 GB (só o necessário para carregar e servir o modelo).
 
 ## Notebooks
 

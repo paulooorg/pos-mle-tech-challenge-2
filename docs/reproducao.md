@@ -10,7 +10,7 @@ cd pos-mle-tech-challenge-2
 ./reproduzir.sh
 ```
 
-O script executa as 9 etapas descritas abaixo, mostra cada comando que roda (`+ comando`), confere os resultados esperados (`OK` ou `FALHOU`) e, no final, **deixa a infraestrutura de pé** para você explorar o MLflow e o RustFS, perguntando se deseja limpar o ambiente. Duração: 15 a 25 minutos (12 minutos num teste com cache de dependências e de imagens; a primeira vez baixa mais coisa). A saída completa fica em `reproducao.log`.
+O script executa as 10 etapas descritas abaixo (a última, a inferência, é um extra), mostra cada comando que roda (`+ comando`), confere os resultados esperados (`OK` ou `FALHOU`) e, no final, **deixa a infraestrutura de pé** para você explorar o MLflow e o RustFS, perguntando se deseja limpar o ambiente. Duração: 15 a 25 minutos (12 minutos num teste com cache de dependências e de imagens; a primeira vez baixa mais coisa). A saída completa fica em `reproducao.log`.
 
 > **O script começa resetando o estado local** e pede confirmação antes. Isso descarta os volumes do Docker deste projeto, os dados gerados, o MLflow local, o cache e as credenciais do DVC, e **mudanças não commitadas** em `dvc.lock`, `metrics.json` e `data/raw/*.dvc`. Sem terminal interativo, use `./reproduzir.sh --sim`.
 
@@ -21,7 +21,7 @@ O script executa as 9 etapas descritas abaixo, mostra cada comando que roda (`+ 
 | Sistema | macOS ou Linux; no Windows, use WSL2 |
 | Git, `make`, [uv](https://docs.astral.sh/uv/) | o uv instala o Python 3.12 e as dependências (testado com uv 0.12.3) |
 | Docker com Compose v2 | **4 CPUs e 4 GiB de RAM**: com menos memória o MLflow é morto (código 137) |
-| Portas livres | `9000` e `9001` (RustFS, S3 local) e `5001` (MLflow) |
+| Portas livres | `9000` e `9001` (RustFS, S3 local), `5001` (MLflow) e `8000` (API de inferência) |
 | Rede | para baixar as dependências e as imagens Docker |
 
 No macOS com Colima: `colima start --cpu 4 --memory 4`. No Docker Desktop: Settings > Resources.
@@ -77,11 +77,22 @@ make train          # o trainer baixa o dado v2 e retreina
 ### 9. Voltar ao estado original
 `make data-v1`. **Verificação:** `dvc.lock`, `metrics.json` e o ponteiro do dado iguais ao commit (outras alterações suas no repositório não interferem).
 
+### 10. Extra: inferência servindo o modelo do Registry
+```bash
+make deploy-inference MODEL=1    # a API serve a versão 1, fixada
+make deploy-inference            # a API passa a servir o champion
+```
+A inferência é um container separado, com a sua própria imagem enxuta (`Dockerfile.inference`, só o necessário para carregar e servir o modelo). O modelo é escolhido pela variável de ambiente `MODEL_VERSION` (`champion` ou o número de uma versão); **trocar de modelo é recriar o container com outro valor**, como um deploy. O script sobe a versão 1, mostra a resposta do `/predict` para os três exemplos do Swagger, e **pergunta se você quer trocar para o champion** (sem terminal ou com `--sim`, troca sozinho); depois mostra a resposta da nova versão. Assim você vê a API recarregando o modelo: o terceiro exemplo é um caso de fronteira em que a versão 1 e o champion **discordam** na classe.
+**Verificações:** a API sobe com a versão 1 fixada, `POST /predict` responde para os 3 exemplos, e depois da troca a API serve a versão do champion. Como é um extra, uma falha aqui aparece como `FALHOU` no resumo, sem interromper as verificações anteriores.
+
+Endpoints: `GET /health` (pronto? qual versão), `GET /model` (versão, threshold, hash do dado, commit, PR-AUC) e `POST /predict` (lote de sessões: probabilidade de compra e classe). O threshold (0,73) vem da tag da versão no Registry. Se a versão pedida não existir, o serviço sobe mas responde `503` com o motivo (e o deploy acusa `unhealthy`).
+
 ## Explorando o resultado
 
 | Serviço | Endereço |
 |---|---|
 | MLflow (UI) | http://localhost:5001 |
+| API de inferência (Swagger) | http://localhost:8000/docs |
 | Console do RustFS | http://localhost:9001 (usuário `devadmin`, senha `devadmin-secret`) |
 
 No MLflow:
@@ -98,7 +109,7 @@ Para encerrar: `docker compose down` (mantém os dados dos volumes), `docker com
 |---|---|
 | Clean code e estrutura | `src/pos_mle_tech_challenge_2/` (módulos curtos, type hints, POO) e etapa 4 |
 | Reprodutibilidade | `pyproject.toml` + `uv.lock`, `.env.example`, seed e parâmetros em `params.yaml`; este script |
-| Docker | `Dockerfile` e `docker-compose.yml` (etapas 6 a 8) |
+| Docker | `Dockerfile` (trainer), `Dockerfile.inference` (inferência) e `docker-compose.yml` (etapas 6 a 10) |
 | DVC + pipeline | `dvc.yaml`, `dvc.lock`, ponteiro `data/raw/*.dvc`, `uv run dvc dag` (etapa 5) |
 | Modelagem clássica | `HistGradientBoostingClassifier` (Scikit-Learn); EDA e escolha em `notebooks/` |
 | MLflow + Registry | runs, métricas e modelo `champion` na UI (etapas 7 e 8) |
@@ -109,7 +120,8 @@ Para encerrar: `docker compose down` (mantém os dados dos volumes), `docker com
 |---|---|
 | O script para no preflight dizendo que o Docker não roda | inicie o Docker (Docker Desktop, ou `colima start --cpu 4 --memory 4`) |
 | `mlflow` reinicia ou o build é interrompido (código 137) | falta de memória no Docker: use 4 GiB ou mais |
-| Porta em uso | libere 9000, 9001 ou 5001. O MLflow usa a **5001** de propósito: a 5000 costuma estar ocupada pelo AirPlay no macOS |
+| A inferência fica `unhealthy` | a versão pedida em `MODEL_VERSION` não existe ou ainda não há champion: rode `make train` e confira `docker compose logs inference` |
+| Porta em uso | libere 9000, 9001, 5001 ou 8000. O MLflow usa a **5001** de propósito: a 5000 costuma estar ocupada pelo AirPlay no macOS |
 | `dvc push` ou `dvc pull` com erro de credenciais | rode as duas linhas `dvc remote modify --local` da etapa 5 |
 | O trainer pede o hash de outro dado no `dvc pull` | a imagem está desatualizada: use `make train` (já reconstrói) |
 | Os CSVs de `data/processed/` aparecem no `git status` depois de um `dvc pull` | `uv run dvc repro --force preprocess` recria o `.gitignore` da pasta |
