@@ -1,0 +1,23 @@
+# Hiperparâmetros e configuração de experimento (lidos pelo DVC e pelo código).
+# Valores definidos em notebooks/02_modeling.ipynb. Infra/ambiente ficam no .env.
+
+seed: 42
+
+split:
+  test_size: 0.2
+  drop_duplicates: true
+
+train:
+  cv_folds: 5
+  primary_metric: average_precision
+  threshold: 0.73
+
+model:
+  type: hist_gradient_boosting # alternativas: random_forest, logistic_regression
+  params:
+    learning_rate: 0.05
+    max_depth: 5
+    max_leaf_nodes: 15
+    min_samples_leaf: 100
+    l2_regularization: 1.0
+    class_weight: balanced
