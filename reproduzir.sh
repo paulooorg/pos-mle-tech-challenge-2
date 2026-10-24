@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Reproduz, de ponta a ponta, o que o Tech Challenge pede: ambiente com uv, testes,
-# pipeline DVC, infraestrutura em Docker (S3 local + MLflow) e treino com Model Registry.
+# pipeline DVC, infraestrutura em Docker (S3 local + MLflow) e treino com Model Registry,
+# mais um extra: a API de inferência servindo o modelo registrado.
 #
 # Uso:   ./reproduzir.sh          pergunta antes de resetar o estado local
 #        ./reproduzir.sh --sim    confirma o reset de antemão (para execução sem terminal)
@@ -13,9 +14,11 @@ cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 
 LOG_FILE="reproducao.log"
 LAST_OUT="$(mktemp)"
-TOTAL_STEPS=9
+TOTAL_STEPS=10
 MIN_DOCKER_MEMORY_BYTES=3758096384 # 3,5 GiB (uma VM de 4 GiB reporta um pouco menos)
-REQUIRED_PORTS="9000 9001 5001"
+REQUIRED_PORTS="9000 9001 5001 8000"
+INFERENCE_URL="http://localhost:8000"
+CHAMPION_VERSION=""
 RAW_POINTER="data/raw/online_shoppers_intention.csv.dvc"
 TRACKED_OUTPUTS="dvc.lock metrics.json ${RAW_POINTER}"
 EXPECTED_V1_AP="0.7705"
@@ -52,18 +55,25 @@ end_step() {
   printf '%s    (%ss)%s\n' "$DIM" "$(( $(date +%s) - STEP_START ))" "$RESET"
 }
 
-# Executa um comando: mostra "+ comando", guarda a saída e para se ele falhar.
-run() {
+# Executa um comando e devolve o código de saída (usado na etapa extra, que não aborta).
+try_run() {
   printf '%s  + %s%s\n' "$DIM" "$*" "$RESET"
   printf '\n$ %s\n' "$*" >> "$LOG_FILE"
   "$@" > "$LAST_OUT" 2>&1
   local status=$?
   cat "$LAST_OUT" >> "$LOG_FILE"
   if [ "$status" -ne 0 ]; then
-    printf '%s--- últimas linhas da saída ---%s\n' "$YELLOW" "$RESET" >&2
-    tail -n 30 "$LAST_OUT" >&2
-    fail "o comando falhou (código $status): $*" "Log completo em ${LOG_FILE}."
+    printf '%s--- últimas linhas da saída ---%s\n' "$YELLOW" "$RESET"
+    tail -n 20 "$LAST_OUT"
   fi
+  return "$status"
+}
+
+# Executa um comando e interrompe o script se ele falhar.
+run() {
+  try_run "$@"
+  local status=$?
+  [ "$status" -eq 0 ] || fail "o comando falhou (código $status): $*" "Log completo em ${LOG_FILE}."
 }
 
 # Registra o resultado de uma verificação (OK ou FALHOU), sem interromper a execução.
@@ -146,7 +156,7 @@ reset_state() {
     ! port_in_use "$port" || busy="$busy $port"
   done
   [ -z "$busy" ] || fail "portas em uso:$busy" \
-    "Libere essas portas (o RustFS usa 9000 e 9001; o MLflow, 5001) e rode de novo."
+    "Libere essas portas (RustFS: 9000 e 9001; MLflow: 5001; inferência: 8000) e rode de novo."
   say "  portas livres: ${REQUIRED_PORTS}"
   end_step
 }
@@ -228,6 +238,7 @@ import mlflow
 mlflow.set_tracking_uri('http://localhost:5001')
 model = mlflow.MlflowClient().get_registered_model('purchase-propensity-classifier')
 print(model.aliases.get('champion'))" 2> /dev/null | tail -n 1)
+  CHAMPION_VERSION="$champion"
   [ "$champion" = "3" ] && record ok "alias champion do Registry aponta para a versão 3" \
     || record fail "alias champion do Registry aponta para a versão 3 (obtido: ${champion:-nenhum})"
   end_step
@@ -241,6 +252,90 @@ restore_v1() {
     record ok "dvc.lock, metrics.json e ponteiro do dado iguais ao commit"
   else
     record fail "dvc.lock, metrics.json e ponteiro do dado iguais ao commit"
+  fi
+  end_step
+}
+
+# Chama a API de inferência: imprime o corpo da resposta e devolve 1 se o status não for 2xx.
+api() {
+  uv run python - "$INFERENCE_URL" "$@" <<'PY'
+import sys
+import urllib.error
+import urllib.request
+
+base, method, path = sys.argv[1:4]
+request = urllib.request.Request(base + path, method=method)
+try:
+    with urllib.request.urlopen(request, timeout=20) as response:
+        print(response.read().decode())
+except urllib.error.HTTPError as error:
+    print(error.read().decode())
+    sys.exit(1)
+PY
+}
+
+# Versão do modelo que a API está servindo (vazio se não houver resposta válida).
+served_version() {
+  api GET /model 2> /dev/null \
+    | uv run python -c "import json, sys; print(json.load(sys.stdin)['version'])" 2> /dev/null
+}
+
+# Envia os exemplos do Swagger ao /predict e imprime uma linha por exemplo.
+show_predictions() {
+  uv run python - "$INFERENCE_URL" <<'PY'
+import json
+import sys
+import urllib.request
+
+from pos_mle_tech_challenge_2.serving.examples import EXAMPLE_SESSIONS
+
+payload = json.dumps({"sessions": list(EXAMPLE_SESSIONS.values())}).encode()
+request = urllib.request.Request(
+    sys.argv[1] + "/predict", data=payload, method="POST",
+    headers={"Content-Type": "application/json"},
+)
+body = json.load(urllib.request.urlopen(request, timeout=20))
+if len(body["predictions"]) != len(EXAMPLE_SESSIONS):
+    sys.exit("resposta com número inesperado de predições")
+print(f"    modelo versão {body['model_version']}, threshold {body['threshold']}")
+for name, item in zip(EXAMPLE_SESSIONS, body["predictions"]):
+    print(f"    {name:24s} probabilidade {item['probability']:.4f} -> classe {item['predicted_class']}")
+PY
+}
+
+want_switch() {
+  if [ "$ASSUME_YES" -eq 0 ] && [ -t 0 ]; then
+    local answer
+    read -r -p "Trocar a inferência para o champion agora? [s/N] " answer
+    [ "$answer" = "s" ]
+  else
+    say "  (sem terminal ou --sim: trocando para o champion automaticamente)"
+  fi
+}
+
+deploy_and_check() {
+  # deploy_and_check <MODEL> <versão esperada> <descrição>
+  if try_run make deploy-inference MODEL="$1" && [ "$(served_version)" = "$2" ]; then
+    record ok "$3"
+    if show_predictions 2>&1 | tee -a "$LOG_FILE"; then
+      record ok "POST /predict responde para os 3 exemplos (versão $2)"
+    else
+      record fail "POST /predict responde para os 3 exemplos (versão $2)"
+    fi
+  else
+    record fail "$3"
+  fi
+}
+
+inference_demo() {
+  step 10 "Extra: inferência servindo o modelo do Registry"
+  deploy_and_check 1 1 "inferência no ar com a versão 1 fixada (MODEL=1)"
+  say "  Explore a API (Swagger com exemplos): ${INFERENCE_URL}/docs"
+  if want_switch; then
+    deploy_and_check champion "$CHAMPION_VERSION" \
+      "troca para o champion: a inferência passou a servir a versão ${CHAMPION_VERSION}"
+  else
+    say "  Troca ignorada. Para trocar depois: make deploy-inference  (champion) ou MODEL=<versão>"
   fi
   end_step
 }
@@ -260,6 +355,7 @@ summary() {
   printf '\n%sPara explorar o resultado (a infraestrutura continua rodando):%s\n' "$BOLD" "$RESET"
   say "  MLflow (runs, métricas, modelos e alias champion):  http://localhost:5001"
   say "  Console do RustFS (bucket dvc-remote):              http://localhost:9001  (devadmin / devadmin-secret)"
+  say "  API de inferência (Swagger):                         ${INFERENCE_URL}/docs"
   say "  Log completo:                                        ${LOG_FILE}"
   return "$failures"
 }
@@ -284,7 +380,7 @@ offer_cleanup() {
 for arg in "$@"; do
   case "$arg" in
     --sim) ASSUME_YES=1 ;;
-    -h | --ajuda) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h | --ajuda) sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) fail "opção desconhecida: $arg (use --sim ou --ajuda)" ;;
   esac
 done
@@ -299,6 +395,7 @@ infrastructure
 train_v1_twice
 train_v2
 restore_v1
+inference_demo
 summary
 failures=$?
 printf '\nTempo total: %s min\n' "$(( ($(date +%s) - START_TIME) / 60 ))"
