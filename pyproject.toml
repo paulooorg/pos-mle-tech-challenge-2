@@ -7,11 +7,8 @@ authors = [
     { name = "paulooorg", email = "goncalvesrpaulo@gmail.com" }
 ]
 requires-python = ">=3.12"
+# Núcleo: o que o código compartilhado (config, data, features) precisa em qualquer imagem.
 dependencies = [
-    "boto3>=1.34",
-    "dvc[s3]>=3.50",
-    "matplotlib>=3.9",
-    "mlflow>=3.0",
     "numpy>=2.0",
     "pandas>=2.2",
     "python-dotenv>=1.0",
@@ -24,13 +21,33 @@ requires = ["uv_build>=0.12.3,<0.13.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
+# Imagem do trainer (Dockerfile): pipeline DVC, MLflow completo (também serve o MLflow do compose).
+training = [
+    "boto3>=1.34",
+    "dvc[s3]>=3.50",
+    "matplotlib>=3.9",
+    "mlflow>=3.0",
+]
+# Imagem de inferência (Dockerfile.inference): API e carregamento do modelo registrado.
+# O mlflow-skinny é resolvido na mesma versão do mlflow completo (mesmo uv.lock).
+serving = [
+    "fastapi>=0.115",
+    "mlflow-skinny>=3.0",
+    "skops>=0.11",
+    "uvicorn>=0.30",
+]
 dev = [
+    "httpx>=0.27",
     "jupyterlab>=4.2",
     "pytest>=8.0",
     "ruff>=0.6",
     "seaborn>=0.13",
     "xgboost>=3.4.1",
 ]
+
+[tool.uv]
+# `uv sync` (desenvolvimento) instala tudo; as imagens escolhem só o grupo do seu papel.
+default-groups = ["dev", "training", "serving"]
 
 [tool.ruff]
 target-version = "py312"

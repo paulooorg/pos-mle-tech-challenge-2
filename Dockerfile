@@ -1,4 +1,6 @@
-# Imagem do projeto (trainer e servidor MLflow). Não carrega dados: eles chegam via `dvc pull`.
+# Imagem do TRAINER (também usada pelo servidor MLflow e pelo init do docker-compose).
+# Instala só o grupo `training`. Não carrega dados: eles chegam via `dvc pull`.
+# A inferência tem a sua própria imagem enxuta: Dockerfile.inference.
 FROM python:3.12-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.12.3 /uv /uvx /bin/
@@ -17,7 +19,7 @@ WORKDIR /app
 
 # Dependências primeiro: a camada fica em cache enquanto pyproject.toml e uv.lock não mudam
 COPY --chown=app:app pyproject.toml uv.lock README.md ./
-RUN uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-default-groups --group training --no-install-project
 
 # Projeto: código, pipeline DVC, ponteiros de dados e o .git (usado pelo DVC)
 COPY --chown=app:app src ./src
@@ -26,6 +28,6 @@ COPY --chown=app:app .dvc ./.dvc
 COPY --chown=app:app data ./data
 COPY --chown=app:app .git ./.git
 COPY --chown=app:app scripts ./scripts
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-default-groups --group training
 
 CMD ["/app/scripts/trainer_entrypoint.sh"]
