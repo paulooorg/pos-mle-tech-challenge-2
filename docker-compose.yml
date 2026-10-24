@@ -35,14 +35,13 @@ services:
       retries: 12
 
   init:
-    image: amazon/aws-cli
-    entrypoint: ["/bin/sh", "/scripts/init_buckets.sh"]
+    # Mesma imagem do projeto (já traz boto3 e scripts/): sem bind mount nem imagem extra.
+    <<: *project-image
+    command: python /app/scripts/init_buckets.py
     environment:
       <<: *s3-credentials
       S3_ENDPOINT_URL: http://rustfs:9000
       BUCKETS: "dvc-remote mlflow-artifacts"
-    volumes:
-      - ./scripts/init_buckets.sh:/scripts/init_buckets.sh:ro
     depends_on:
       rustfs:
         condition: service_healthy
