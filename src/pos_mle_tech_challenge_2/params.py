@@ -29,21 +29,13 @@ class TrainParams:
 
 
 @dataclass(frozen=True)
-class ModelParams:
-    """Algoritmo escolhido e seus hiperparâmetros."""
-
-    algorithm: str
-    params: dict[str, Any]
-
-
-@dataclass(frozen=True)
 class Params:
     """Conjunto completo de parâmetros do experimento."""
 
     seed: int
     split: SplitParams
     train: TrainParams
-    model: ModelParams
+    model: dict[str, Any]
 
 
 def load_params(path: Path = DEFAULT_PARAMS_PATH) -> Params:
@@ -63,7 +55,5 @@ def load_params(path: Path = DEFAULT_PARAMS_PATH) -> Params:
         seed=raw["seed"],
         split=SplitParams(**raw["split"]),
         train=TrainParams(**raw["train"]),
-        model=ModelParams(
-            algorithm=raw["model"]["type"], params=raw["model"]["params"]
-        ),
+        model=raw["model"],
     )

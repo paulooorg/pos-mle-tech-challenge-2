@@ -13,8 +13,8 @@ def test_real_params_file_is_valid() -> None:
     assert params.seed == 42
     assert 0 < params.split.test_size < 1
     assert params.train.primary_metric == "average_precision"
-    assert params.model.algorithm == "hist_gradient_boosting"
-    assert params.model.params["class_weight"] == "balanced"
+    assert params.model["class_weight"] == "balanced"
+    assert "type" not in params.model
 
 
 def test_params_are_parsed_into_typed_sections(tmp_path: Path) -> None:
@@ -23,7 +23,7 @@ def test_params_are_parsed_into_typed_sections(tmp_path: Path) -> None:
         "seed: 1\n"
         "split: {test_size: 0.3, drop_duplicates: false}\n"
         "train: {cv_folds: 3, primary_metric: roc_auc, threshold: 0.5}\n"
-        "model: {type: random_forest, params: {n_estimators: 10}}\n"
+        "model: {max_depth: 4}\n"
     )
 
     params = load_params(params_file)
@@ -31,8 +31,7 @@ def test_params_are_parsed_into_typed_sections(tmp_path: Path) -> None:
     assert params.seed == 1
     assert params.split.drop_duplicates is False
     assert params.train.cv_folds == 3
-    assert params.model.algorithm == "random_forest"
-    assert params.model.params == {"n_estimators": 10}
+    assert params.model == {"max_depth": 4}
 
 
 def test_missing_section_raises_key_error(tmp_path: Path) -> None:

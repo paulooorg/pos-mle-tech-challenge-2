@@ -1,6 +1,5 @@
-"""Testes dos estágios preprocess e train (esqueleto) do pipeline."""
+"""Teste do estágio preprocess do pipeline."""
 
-import json
 from collections.abc import Callable
 from pathlib import Path
 
@@ -14,9 +13,7 @@ from pos_mle_tech_challenge_2.config import (
     load_settings,
 )
 from pos_mle_tech_challenge_2.params import load_params
-from pos_mle_tech_challenge_2.pipelines import train as train_module
 from pos_mle_tech_challenge_2.pipelines.preprocess import PreprocessPipeline
-from pos_mle_tech_challenge_2.pipelines.train import TrainPipeline
 
 
 @pytest.fixture
@@ -41,17 +38,3 @@ def test_preprocess_writes_train_and_test_files(settings: Settings) -> None:
     test = pd.read_csv(settings.data_processed_dir / TEST_FILENAME)
     assert len(train) + len(test) == 200  # 10 duplicatas removidas
     assert len(test) == 40
-
-
-def test_train_skeleton_writes_metrics(
-    settings: Settings, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    metrics_path = tmp_path / "metrics.json"
-    monkeypatch.setattr(train_module, "METRICS_PATH", metrics_path)
-    PreprocessPipeline(settings, load_params()).run()
-
-    metrics = TrainPipeline(settings).run()
-
-    assert json.loads(metrics_path.read_text()) == metrics
-    assert metrics["n_train"] == 160
-    assert metrics["n_test"] == 40

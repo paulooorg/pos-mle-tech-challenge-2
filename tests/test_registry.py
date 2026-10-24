@@ -31,7 +31,7 @@ def log_model(
     def _log(max_depth: int = 2) -> tuple[str, Pipeline]:
         pipeline = (
             ModelFactory(seed=1)
-            .build_pipeline("hist_gradient_boosting", {"max_depth": max_depth})
+            .build_pipeline({"max_depth": max_depth})
             .fit(features, target)
         )
         with tracker.start_run():

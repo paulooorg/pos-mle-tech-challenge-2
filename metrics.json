@@ -1,6 +1,8 @@
 {
-  "n_train": 6013,
-  "n_test": 1504,
-  "positive_rate_train": 0.1241,
-  "positive_rate_test": 0.1237
+  "cv_average_precision_mean": 0.7917,
+  "test_average_precision": 0.7705,
+  "test_roc_auc": 0.9565,
+  "promoted": true,
+  "registered_version": 1,
+  "mlflow_run_id": "cbf7ff8d17324c58bac45b0a8bea7016"
 }

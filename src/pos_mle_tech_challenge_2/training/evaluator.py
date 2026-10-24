@@ -19,6 +19,9 @@ Metrics = dict[str, float]
 
 CV_SCORING = ("average_precision", "roc_auc", "f1", "precision", "recall")
 
+# Métricas que não dependem de threshold: podem ser usadas para escolher o modelo.
+THRESHOLD_FREE_METRICS = ("average_precision", "roc_auc")
+
 
 class ProbabilisticModel(Protocol):
     """Qualquer modelo que devolve probabilidades por classe."""

@@ -65,13 +65,12 @@ def test_figure_is_saved_as_run_artifact(
 
 
 def test_logged_model_has_signature_and_reproduces_predictions(
-    tracker: ExperimentTracker, make_xy: Callable[..., XY]
+    tracker: ExperimentTracker,
+    make_xy: Callable[..., XY],
 ) -> None:
     features, target = make_xy()
     pipeline = (
-        ModelFactory(seed=1)
-        .build_pipeline("hist_gradient_boosting", {"max_depth": 3})
-        .fit(features, target)
+        ModelFactory(seed=1).build_pipeline({"max_depth": 3}).fit(features, target)
     )
 
     with tracker.start_run():

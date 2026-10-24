@@ -18,8 +18,8 @@ stages:
       nfiles: 10
     - path: src/pos_mle_tech_challenge_2/params.py
       hash: md5
-      md5: 30cd4b15437502bcd7755a3c9d20c1f7
-      size: 1506
+      md5: a3a93bfb07f9c835c6abbc2f6d839706
+      size: 1278
     - path: src/pos_mle_tech_challenge_2/pipelines/preprocess.py
       hash: md5
       md5: 5fb8cc018845004decf77f7cc61b1fa5
@@ -61,33 +61,31 @@ stages:
       nfiles: 10
     - path: src/pos_mle_tech_challenge_2/features
       hash: md5
-      md5: 8353818b47127265918f7bdd9335edfa.dir
-      size: 51
-      nfiles: 1
+      md5: e23724bd33989af992844a4996034bf2.dir
+      size: 3268
+      nfiles: 4
     - path: src/pos_mle_tech_challenge_2/params.py
       hash: md5
-      md5: 30cd4b15437502bcd7755a3c9d20c1f7
-      size: 1506
+      md5: a3a93bfb07f9c835c6abbc2f6d839706
+      size: 1278
     - path: src/pos_mle_tech_challenge_2/pipelines/train.py
       hash: md5
-      md5: 5c4ef6d7ddbafd7d89bbc66f34efde1e
-      size: 1858
+      md5: b91e1213ea9919d76b96dfa1ed3e3824
+      size: 3192
     - path: src/pos_mle_tech_challenge_2/training
       hash: md5
-      md5: ede2983e8404bfd63b99d914e823a768.dir
-      size: 68
-      nfiles: 1
+      md5: 013efcd20a99f7edee4dc2e4cd36b8b1.dir
+      size: 57095
+      nfiles: 18
     params:
       params.yaml:
         model:
-          type: hist_gradient_boosting
-          params:
-            learning_rate: 0.05
-            max_depth: 5
-            max_leaf_nodes: 15
-            min_samples_leaf: 100
-            l2_regularization: 1.0
-            class_weight: balanced
+          learning_rate: 0.05
+          max_depth: 5
+          max_leaf_nodes: 15
+          min_samples_leaf: 100
+          l2_regularization: 1.0
+          class_weight: balanced
         seed: 42
         train:
           cv_folds: 5
@@ -96,5 +94,5 @@ stages:
     outs:
     - path: metrics.json
       hash: md5
-      md5: 02f10291abd30254fa421cbba171e80a
-      size: 105
+      md5: a8d195ec4114386613458c01ddb6a82f
+      size: 206

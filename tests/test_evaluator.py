@@ -66,7 +66,7 @@ def test_cross_validation_reports_mean_and_std_for_each_metric(
     make_xy: Callable[..., XY],
 ) -> None:
     features, target = make_xy()
-    pipeline = ModelFactory(seed=1).build_pipeline("logistic_regression", {})
+    pipeline = ModelFactory(seed=1).build_pipeline({"max_iter": 10})
 
     metrics = Evaluator(cv_folds=3, seed=1).cross_validate(pipeline, features, target)
 
@@ -77,7 +77,7 @@ def test_cross_validation_reports_mean_and_std_for_each_metric(
 
 def test_cross_validation_is_reproducible(make_xy: Callable[..., XY]) -> None:
     features, target = make_xy()
-    pipeline = ModelFactory(seed=1).build_pipeline("logistic_regression", {})
+    pipeline = ModelFactory(seed=1).build_pipeline({"max_iter": 10})
 
     first = Evaluator(cv_folds=3, seed=5).cross_validate(pipeline, features, target)
     second = Evaluator(cv_folds=3, seed=5).cross_validate(pipeline, features, target)
