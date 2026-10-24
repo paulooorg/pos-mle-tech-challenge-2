@@ -104,6 +104,7 @@ def create_app(load_model: LoadModel) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        """Carrega o modelo na subida da API; se falhar, guarda o motivo para o 503."""
         app.state.predictor, app.state.load_error = try_load(load_model)
         yield
 
