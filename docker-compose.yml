@@ -1,6 +1,7 @@
 # Infra local: S3 (RustFS), servidor MLflow e trainer. Uso:
 #   docker compose up -d rustfs init mlflow     # sobe a infra e cria os buckets
 #   docker compose run --build --rm trainer     # dvc pull + dvc repro
+#   MODEL_VERSION=1 docker compose up -d --build inference   # inferência (ou: make deploy-inference)
 name: pos-mle-tc2
 
 x-project-image: &project-image
@@ -86,6 +87,31 @@ services:
     depends_on:
       mlflow:
         condition: service_healthy
+
+  inference:
+    # Imagem enxuta e própria (Dockerfile.inference). Não entra no `make up`: precisa de um
+    # modelo registrado. Suba com `make deploy-inference MODEL=<champion|versão>`.
+    build:
+      context: .
+      dockerfile: Dockerfile.inference
+    image: pos-mle-tc2-inference
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MODEL_VERSION: ${MODEL_VERSION:-champion}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 5s
+      timeout: 5s
+      retries: 24
 
 volumes:
   rustfs_data:

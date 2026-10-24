@@ -1,10 +1,12 @@
 RAW_FILE := data/raw/online_shoppers_intention.csv
 
 .DEFAULT_GOAL := help
-.PHONY: help install check repro data-v1 data-v2 up train clean
+MODEL ?= champion
+
+.PHONY: help install check repro data-v1 data-v2 up train deploy-inference clean
 
 help: ## Lista os alvos disponíveis
-	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-9s %s\n", $$1, $$2}'
+	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-17s %s\n", $$1, $$2}'
 
 install: ## Instala as dependências (uv sync)
 	uv sync
@@ -31,6 +33,11 @@ up: ## Sobe a infra local (RustFS e MLflow), cria os buckets e envia o dado
 
 train: ## Roda o trainer no container: treina, registra no MLflow e aplica o portão
 	docker compose run --build --rm trainer
+
+deploy-inference: ## Sobe/atualiza a inferência: make deploy-inference MODEL=champion|<versão>
+	@docker compose ps --status running --services | grep -qx mlflow || { echo "O MLflow não está rodando: rode make up e make train antes."; exit 1; }
+	MODEL_VERSION=$(MODEL) docker compose up -d --build --force-recreate --no-deps --wait inference
+	@echo "Inferência no ar com MODEL_VERSION=$(MODEL): http://localhost:8000/docs"
 
 clean: ## Reseta o estado local (como numa máquina nova) para repetir docs/reproducao.md
 	@echo "Isto apaga: volumes do Docker (bucket e MLflow do compose), data/raw/*.csv,"
