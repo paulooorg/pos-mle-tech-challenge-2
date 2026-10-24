@@ -50,7 +50,7 @@ EXAMPLE_SESSIONS: dict[str, dict[str, Any]] = {
         "ProductRelated_Duration": 700.0,
         "BounceRates": 0.01,
         "ExitRates": 0.04,
-        "PageValues": 6.0,
+        "PageValues": 3.0,
         "SpecialDay": 0.0,
         "Month": "May",
         "OperatingSystems": 2,
@@ -65,5 +65,5 @@ EXAMPLE_SESSIONS: dict[str, dict[str, Any]] = {
 EXAMPLE_SUMMARIES: dict[str, str] = {
     "alta_propensao": "Alta propensão: PageValues alto, visitante novo, novembro",
     "navegacao_curta": "Navegação curta: sai rápido, sem valor de página",
-    "visitante_recorrente": "Visitante recorrente fora da alta temporada",
+    "visitante_recorrente": "Visitante recorrente, caso de fronteira: versões diferentes do modelo podem discordar",
 }
