@@ -1,5 +1,6 @@
 """Configurações do projeto lidas de variáveis de ambiente (arquivo .env)."""
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -7,6 +8,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+TRAIN_FILENAME = "train.csv"
+TEST_FILENAME = "test.csv"
+LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
 
 DEFAULTS: dict[str, str] = {
     "MLFLOW_TRACKING_URI": "sqlite:///mlflow.db",
@@ -63,3 +68,8 @@ def load_settings(env_file: Path | None = None) -> Settings:
         data_processed_dir=_read_path("DATA_PROCESSED_DIR"),
         log_level=_read("LOG_LEVEL").upper(),
     )
+
+
+def configure_logging(level: str) -> None:
+    """Configura o logging da aplicação com o nível informado (ex.: INFO)."""
+    logging.basicConfig(level=level, format=LOG_FORMAT)
