@@ -52,6 +52,60 @@ Um único comando reproduz tudo: instala o ambiente, roda os testes, executa o p
 
 O [guia de reprodução](docs/reproducao.md) explica o que cada etapa faz e traz os comandos para executá-las à mão.
 
+### Alternativa sem o script (passo a passo)
+
+O fluxo do `reproduzir.sh` que passa pelo MLflow do Compose (sem a execução local do pipeline), executado à mão a partir da raiz do repositório. O comentário de cada comando fica na linha acima, para você poder copiar e colar o bloco inteiro no terminal.
+
+```bash
+# Instala as dependências nas versões exatas do uv.lock
+make install
+
+# Lint (ruff) e testes (pytest)
+make check
+
+# Credenciais do S3 local (RustFS) para o remote do DVC; ficam em .dvc/config.local, fora do git
+uv run dvc remote modify --local rustfs access_key_id devadmin
+uv run dvc remote modify --local rustfs secret_access_key devadmin-secret
+
+# Libera o dado v1 (Feb a Oct) em data/raw/ e registra no DVC: cria o ponteiro .dvc (um hash)
+make data-v1
+
+# Sobe o RustFS e o servidor MLflow, cria os buckets e envia o dado v1 ao bucket (dvc push)
+make up
+
+# Confere o estado dos serviços: rustfs e mlflow saudáveis; init concluído (Exited 0)
+docker compose ps -a
+
+# 1º treino no container: a versão 1 vira champion (primeiro modelo)
+make train
+
+# 2º treino, com o mesmo dado: empate, o champion não muda (versão 2 não promovida)
+make train
+
+# Dado novo (v2, dataset completo com Nov e Dec): atualiza o ponteiro do DVC
+make data-v2
+
+# Envia o dado novo ao bucket
+uv run dvc push
+
+# Retreino: a versão 3 supera o champion e é promovida
+make train
+
+# Extra: sobe a API de inferência servindo a versão 1 (http://localhost:8000/docs)
+make deploy-inference MODEL=1
+
+# Troca a API para o champion (recria o container com outro MODEL_VERSION)
+make deploy-inference
+
+# Volta o ponteiro do dado para a v1 (estado commitado)
+make data-v1
+
+# Opcional: reseta o estado local (volumes, dados gerados, MLflow local, cache e credenciais do DVC); pede confirmação
+make clean
+```
+
+O `make train` executa o `docker compose run --build --rm trainer`, e é o `scripts/trainer_entrypoint.sh` (o `CMD` da imagem) que faz, dentro do container, o `dvc pull` do dado de entrada e o `dvc repro --force`. Por isso não há um `dvc repro` solto nos treinos do container. Depois do `make train`, o MLflow em http://localhost:5001 mostra as versões e o alias `champion`.
+
 ## Comandos
 
 | Comando | O que faz |
