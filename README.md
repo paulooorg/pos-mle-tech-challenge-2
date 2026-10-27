@@ -219,4 +219,5 @@ Fica de fora, por escopo: gatilho automático de treino, validação de dados na
 
 ## Vídeo (método STAR)
 
-_(link a adicionar)_
+- Slides usados no vídeo: [`docs/apresentacao.pdf`](docs/apresentacao.pdf)
+- Vídeo: _(link a adicionar)_
